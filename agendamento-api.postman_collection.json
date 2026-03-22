@@ -1,0 +1,192 @@
+{
+  "info": {
+    "name": "Agendamento API",
+    "description": "Colecao completa da API de agendamento, pronta para uso sem environment. Todos os valores estao nas variaveis da propria colecao.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "coLotacao", "value": "500001", "type": "string" },
+    { "key": "coProntuario", "value": "900001", "type": "string" },
+    { "key": "coOrigem", "value": "1", "type": "string" },
+    { "key": "coMotivoReserva", "value": "1", "type": "string" },
+    { "key": "data", "value": "2026-03-23", "type": "string" },
+    { "key": "inicio", "value": "2026-03-23", "type": "string" },
+    { "key": "fim", "value": "2026-03-30", "type": "string" },
+    { "key": "horaInicio", "value": "08:20", "type": "string" },
+    { "key": "coAgendado", "value": "990001", "type": "string" },
+    { "key": "cpf", "value": "12345678901", "type": "string" },
+    { "key": "coSeqEquipe", "value": "1", "type": "string" },
+    { "key": "motivoCancelamento", "value": "CIDADAO", "type": "string" },
+    { "key": "observacao", "value": "agendamento via Postman", "type": "string" }
+  ],
+  "item": [
+    {
+      "name": "Agenda",
+      "item": [
+        {
+          "name": "Obter grade",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "http://localhost:8080/api/v1/agenda/{{coLotacao}}/grade?data={{data}}",
+            "description": "Retorna a grade de horarios de uma lotacao em uma data (YYYY-MM-DD)."
+          },
+          "response": []
+        },
+        {
+          "name": "Listar agendamentos",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "http://localhost:8080/api/v1/agenda/{{coLotacao}}/agendamentos?inicio={{inicio}}&fim={{fim}}",
+            "description": "Lista os agendamentos por intervalo de datas (YYYY-MM-DD)."
+          },
+          "response": []
+        },
+        {
+          "name": "Agendar consulta",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "  var json = pm.response.json();",
+                  "  if (json && json.coAgendado) {",
+                  "    pm.collectionVariables.set('coAgendado', String(json.coAgendado));",
+                  "  }",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"coLotacao\": {{coLotacao}},\n  \"coProntuario\": {{coProntuario}},\n  \"data\": \"{{data}}\",\n  \"horaInicio\": \"{{horaInicio}}\",\n  \"coOrigem\": {{coOrigem}},\n  \"coMotivoReserva\": {{coMotivoReserva}},\n  \"observacao\": \"{{observacao}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "http://localhost:8080/api/v1/agenda/agendar",
+            "description": "Cria agendamento. Em caso de sucesso (201), salva automaticamente o coAgendado retornado na variavel da colecao."
+          },
+          "response": []
+        },
+        {
+          "name": "Cancelar agendamento",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"motivoCancelamento\": \"{{motivoCancelamento}}\",\n  \"observacao\": \"{{observacao}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "http://localhost:8080/api/v1/agenda/{{coAgendado}}/cancelar",
+            "description": "Cancela um agendamento pelo codigo. motivoCancelamento: CIDADAO ou PROFISSIONAL."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Cidadao",
+      "item": [
+        {
+          "name": "Buscar por CPF",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "http://localhost:8080/api/v1/cidadao/{{cpf}}",
+            "description": "Consulta dados do cidadao por CPF (11 digitos numericos)."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Dominios",
+      "item": [
+        {
+          "name": "Motivos de reserva",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "http://localhost:8080/api/v1/dominios/motivos-reserva"
+          },
+          "response": []
+        },
+        {
+          "name": "Origens",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "http://localhost:8080/api/v1/dominios/origens"
+          },
+          "response": []
+        },
+        {
+          "name": "Situacoes de agendado",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "http://localhost:8080/api/v1/dominios/situacoes-agendado"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Equipe",
+      "item": [
+        {
+          "name": "Listar profissionais por equipe",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "http://localhost:8080/api/v1/equipe/{{coSeqEquipe}}/profissionais"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Docs",
+      "item": [
+        {
+          "name": "OpenAPI JSON",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "http://localhost:8080/v3/api-docs"
+          },
+          "response": []
+        },
+        {
+          "name": "Swagger UI",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "http://localhost:8080/swagger-ui.html"
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}
+

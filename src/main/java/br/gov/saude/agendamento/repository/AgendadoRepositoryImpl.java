@@ -23,6 +23,7 @@ public class AgendadoRepositoryImpl implements AgendadoRepositoryCustom {
     ) {
         Object result = entityManager.createNativeQuery("""
                 INSERT INTO public.tb_agendado (
+                    co_seq_agendado,
                     dt_agendado, hr_inicial_agendado, ds_observacao,
                     st_agendado, co_lotacao_agendada, co_motivo_reserva,
                     co_origem, co_prontuario, co_ator_papel_criador,
@@ -30,6 +31,7 @@ public class AgendadoRepositoryImpl implements AgendadoRepositoryCustom {
                     st_fora_ubs, tp_agendamento,
                     st_suprime_notificacao_agonl, st_enviou_email_cidadao
                 ) VALUES (
+                    nextval(pg_get_serial_sequence('public.tb_agendado', 'co_seq_agendado')),
                     CAST(:data AS date),
                     CAST(:data || ' ' || :horaInicio AS timestamp),
                     :observacao,

@@ -21,6 +21,22 @@ public class AgendadoRepositoryImpl implements AgendadoRepositoryCustom {
             String observacao,
             String uuid
     ) {
+        // Evita corrida no fallback MAX+1 quando o banco nao expoe sequence via pg_get_serial_sequence.
+        entityManager.createNativeQuery("LOCK TABLE public.tb_agendado IN EXCLUSIVE MODE").executeUpdate();
+
+        Long coSeqAgendado = ((Number) entityManager.createNativeQuery("""
+                SELECT COALESCE(
+                    (
+                        SELECT nextval(pg_get_serial_sequence('public.tb_agendado', 'co_seq_agendado'))
+                    ),
+                    (
+                        SELECT COALESCE(MAX(ag.co_seq_agendado), 0) + 1
+                        FROM public.tb_agendado ag
+                    )
+                )
+                """)
+                .getSingleResult()).longValue();
+
         Object result = entityManager.createNativeQuery("""
                 INSERT INTO public.tb_agendado (
                     co_seq_agendado,
@@ -31,7 +47,7 @@ public class AgendadoRepositoryImpl implements AgendadoRepositoryCustom {
                     st_fora_ubs, tp_agendamento,
                     st_suprime_notificacao_agonl, st_enviou_email_cidadao
                 ) VALUES (
-                    nextval(pg_get_serial_sequence('public.tb_agendado', 'co_seq_agendado')),
+                    :coSeqAgendado,
                     CAST(:data AS date),
                     CAST(:data || ' ' || :horaInicio AS timestamp),
                     :observacao,
@@ -48,6 +64,7 @@ public class AgendadoRepositoryImpl implements AgendadoRepositoryCustom {
                 )
                 RETURNING co_seq_agendado
                 """)
+                .setParameter("coSeqAgendado", coSeqAgendado)
                 .setParameter("data", data)
                 .setParameter("horaInicio", horaInicio)
                 .setParameter("observacao", observacao)

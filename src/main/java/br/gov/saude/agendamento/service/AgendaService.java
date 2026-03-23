@@ -21,6 +21,8 @@ import br.gov.saude.agendamento.repository.LotacaoRepository;
 import br.gov.saude.agendamento.repository.ProntuarioRepository;
 import br.gov.saude.agendamento.repository.projection.GradeSlotProjection;
 import br.gov.saude.agendamento.repository.projection.LotacaoDetalheProjection;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -36,6 +38,7 @@ import java.util.UUID;
 public class AgendaService {
 
     private static final long STATUS_AGENDADO = 1L;
+    private static final Logger log = LoggerFactory.getLogger(AgendaService.class);
 
     private final LotacaoRepository lotacaoRepository;
     private final ProntuarioRepository prontuarioRepository;
@@ -54,25 +57,47 @@ public class AgendaService {
 
     @Transactional(readOnly = true)
     public GradeResponse obterGrade(Long coLotacao, LocalDate data) {
+        log.info("FLOW_START service=AgendaService metodo=obterGrade coLotacao={} data={}", coLotacao, data);
+
         LotacaoDetalheProjection detalhe = lotacaoRepository.buscarDetalheLotacao(coLotacao)
                 .orElseThrow(() -> new LotacaoNaoEncontradaException("Lotacao informada nao foi encontrada."));
 
+        log.info("FLOW_CRITICAL service=AgendaService metodo=obterGrade etapa=lotacaoEncontrada coLotacao={} profissional={} cbo={}",
+                coLotacao,
+                detalhe.getNomeProfissional(),
+                detalhe.getNoCbo());
+
         if (isFimDeSemana(data)) {
-            return gradeVaziaComMensagem(
+            log.warn("FLOW_CRITICAL service=AgendaService metodo=obterGrade etapa=fimDeSemana coLotacao={} data={}", coLotacao, data);
+            GradeResponse response = gradeVaziaComMensagem(
                     coLotacao,
                     detalhe.getNomeProfissional(),
                     detalhe.getNoCbo(),
                     data,
                     "Sem agenda configurada para este dia da semana."
             );
+
+            log.info("FLOW_END service=AgendaService metodo=obterGrade coLotacao={} data={} totalSlots={} mensagem={}",
+                    coLotacao,
+                    data,
+                    response.totalSlots(),
+                    response.mensagem());
+            return response;
         }
 
         if (!cfgAgendaRepository.existsByCoEntidadeConfigurada(coLotacao)) {
+            log.warn("FLOW_CRITICAL service=AgendaService metodo=obterGrade etapa=agendaNaoConfigurada coLotacao={} data={}", coLotacao, data);
             throw new AgendaNaoConfiguradaException("Profissional sem agenda configurada.");
         }
 
         int diaSemana = data.getDayOfWeek().getValue();
         List<GradeSlotProjection> slotsRaw = agendadoRepository.buscarGrade(coLotacao, data.toString(), diaSemana);
+
+        log.info("FLOW_CRITICAL service=AgendaService metodo=obterGrade etapa=gradeConsultada coLotacao={} data={} diaSemana={} totalSlotsRaw={}",
+                coLotacao,
+                data,
+                diaSemana,
+                slotsRaw.size());
 
         List<SlotResponse> slots = slotsRaw.stream()
                 .map(slot -> new SlotResponse(
@@ -97,7 +122,7 @@ public class AgendaService {
         int ocupados = (int) slots.stream().filter(s -> "OCUPADO".equals(s.situacao())).count();
         int bloqueados = (int) slots.stream().filter(s -> "BLOQUEADO".equals(s.situacao())).count();
 
-        return new GradeResponse(
+        GradeResponse response = new GradeResponse(
                 coLotacao,
                 detalhe.getNomeProfissional(),
                 detalhe.getNoCbo(),
@@ -112,19 +137,41 @@ public class AgendaService {
                 ocupados,
                 bloqueados
         );
+
+        log.info("FLOW_END service=AgendaService metodo=obterGrade coLotacao={} data={} totalSlots={} disponiveis={} ocupados={} bloqueados={}",
+                coLotacao,
+                data,
+                response.totalSlots(),
+                response.slotsDisponiveis(),
+                response.slotsOcupados(),
+                response.slotsBloqueados());
+
+        return response;
     }
 
     @Transactional(readOnly = true)
     public List<AgendamentoResponse> listarAgendamentos(Long coLotacao, LocalDate inicio, LocalDate fim) {
+        log.info("FLOW_START service=AgendaService metodo=listarAgendamentos coLotacao={} inicio={} fim={}",
+                coLotacao,
+                inicio,
+                fim);
+
         long dias = ChronoUnit.DAYS.between(inicio, fim);
         if (dias < 0) {
+            log.warn("FLOW_CRITICAL service=AgendaService metodo=listarAgendamentos etapa=periodoInvalido coLotacao={} inicio={} fim={}",
+                    coLotacao,
+                    inicio,
+                    fim);
             throw new IllegalArgumentException("Data inicial deve ser menor ou igual a data final.");
         }
         if (dias > 60) {
+            log.warn("FLOW_CRITICAL service=AgendaService metodo=listarAgendamentos etapa=periodoMaximoExcedido coLotacao={} dias={}",
+                    coLotacao,
+                    dias);
             throw new PeriodoMaximoExcedidoException("O periodo informado nao pode ultrapassar 60 dias.");
         }
 
-        return agendadoRepository.listarAgendamentosPeriodo(coLotacao, inicio, fim)
+        List<AgendamentoResponse> response = agendadoRepository.listarAgendamentosPeriodo(coLotacao, inicio, fim)
                 .stream()
                 .map(item -> new AgendamentoResponse(
                         item.getCoSeqAgendado(),
@@ -138,30 +185,51 @@ public class AgendaService {
                         item.getDsObservacao()
                 ))
                 .toList();
+
+        log.info("FLOW_END service=AgendaService metodo=listarAgendamentos coLotacao={} totalRegistros={}",
+                coLotacao,
+                response.size());
+
+        return response;
     }
 
     @Transactional
     public AgendamentoCriadoResponse agendar(AgendarRequest request) {
+        log.info("FLOW_START service=AgendaService metodo=agendar coLotacao={} coProntuario={} data={} horaInicio={}",
+                request.coLotacao(),
+                request.coProntuario(),
+                request.data(),
+                request.horaInicio());
+
         // 1. Lotacao ativa
         lotacaoRepository.buscarLotacaoAtiva(request.coLotacao())
                 .orElseThrow(() -> new LotacaoNaoEncontradaException("Lotacao inexistente ou inativa."));
+
+        log.info("FLOW_CRITICAL service=AgendaService metodo=agendar etapa=lotacaoAtivaValidada coLotacao={}", request.coLotacao());
 
         // 2. Prontuario existe
         prontuarioRepository.findById(request.coProntuario())
                 .orElseThrow(() -> new RecursoNaoEncontradoException("Prontuario nao encontrado."));
 
+        log.info("FLOW_CRITICAL service=AgendaService metodo=agendar etapa=prontuarioValidado coProntuario={}", request.coProntuario());
+
         // 3. Agenda configurada
         if (!cfgAgendaRepository.existsByCoEntidadeConfigurada(request.coLotacao())) {
+            log.warn("FLOW_CRITICAL service=AgendaService metodo=agendar etapa=agendaNaoConfigurada coLotacao={}", request.coLotacao());
             throw new AgendaNaoConfiguradaException("Profissional sem agenda configurada.");
         }
 
+        log.info("FLOW_CRITICAL service=AgendaService metodo=agendar etapa=agendaConfigurada coLotacao={}", request.coLotacao());
+
         // 4. Nao pode ser fim de semana
         if (isFimDeSemana(request.data())) {
+            log.warn("FLOW_CRITICAL service=AgendaService metodo=agendar etapa=fimDeSemana data={}", request.data());
             throw new IllegalArgumentException("Nao e permitido agendar em final de semana.");
         }
 
         // 5. Data nao pode ser passada
         if (request.data().isBefore(LocalDate.now())) {
+            log.warn("FLOW_CRITICAL service=AgendaService metodo=agendar etapa=dataPassada data={}", request.data());
             throw new IllegalArgumentException("Nao e permitido agendar em data passada.");
         }
 
@@ -174,7 +242,14 @@ public class AgendaService {
                 .findFirst()
                 .orElseThrow(() -> new SlotIndisponivelException("Slot nao encontrado para a hora informada."));
 
+        log.info("FLOW_CRITICAL service=AgendaService metodo=agendar etapa=slotLocalizado horaInicio={} situacao={}",
+                hora,
+                slot.situacao());
+
         if (!"DISPONIVEL".equals(slot.situacao())) {
+            log.warn("FLOW_CRITICAL service=AgendaService metodo=agendar etapa=slotIndisponivel horaInicio={} situacao={}",
+                    hora,
+                    slot.situacao());
             throw new SlotIndisponivelException("Slot selecionado nao esta disponivel.");
         }
 
@@ -184,6 +259,7 @@ public class AgendaService {
                 request.coProntuario(),
                 request.data()
         );
+        log.info("FLOW_CRITICAL service=AgendaService metodo=agendar etapa=validacaoDuplicidade quantidadeAgendamentosAtivos={}", quantidade);
         if (quantidade > 0) {
             throw new AgendamentoDuplicadoException("Cidadao ja possui agendamento ativo no mesmo dia para este profissional.");
         }
@@ -202,7 +278,11 @@ public class AgendaService {
                 uuid
         );
 
-        return new AgendamentoCriadoResponse(
+        log.info("FLOW_CRITICAL service=AgendaService metodo=agendar etapa=agendamentoInserido coAgendado={} protocolo={}",
+                coAgendado,
+                uuid);
+
+        AgendamentoCriadoResponse response = new AgendamentoCriadoResponse(
                 coAgendado,
                 request.coLotacao(),
                 request.coProntuario(),
@@ -211,14 +291,32 @@ public class AgendaService {
                 "AGENDADO",
                 uuid
         );
+
+        log.info("FLOW_END service=AgendaService metodo=agendar coAgendado={} status={} uuidAgendamento={}",
+                response.coAgendado(),
+                response.status(),
+                response.uuidAgendamento());
+
+        return response;
     }
 
     @Transactional
     public CancelamentoResponse cancelar(Long coAgendado, CancelarRequest request) {
+        log.info("FLOW_START service=AgendaService metodo=cancelar coAgendado={} motivoCancelamento={}",
+                coAgendado,
+                request.motivoCancelamento());
+
         Agendado agendamento = agendadoRepository.findById(coAgendado)
                 .orElseThrow(() -> new RecursoNaoEncontradoException("Agendamento nao encontrado."));
 
+        log.info("FLOW_CRITICAL service=AgendaService metodo=cancelar etapa=agendamentoEncontrado coAgendado={} statusAtual={}",
+                coAgendado,
+                agendamento.getStAgendado());
+
         if (agendamento.getStAgendado() == null || agendamento.getStAgendado() != STATUS_AGENDADO) {
+            log.warn("FLOW_CRITICAL service=AgendaService metodo=cancelar etapa=statusInvalido coAgendado={} statusAtual={}",
+                    coAgendado,
+                    agendamento.getStAgendado());
             throw new CancelamentoInvalidoException("Somente agendamentos com status AGENDADO podem ser cancelados.");
         }
 
@@ -231,8 +329,18 @@ public class AgendaService {
         agendamento.setStAgendado(novoStatus);
         agendadoRepository.save(agendamento);
 
+        log.info("FLOW_CRITICAL service=AgendaService metodo=cancelar etapa=statusAtualizado coAgendado={} novoStatus={}",
+                coAgendado,
+                novoStatus);
+
         String status = novoStatus == 2L ? "CANCELADO_CIDADAO" : "CANCELADO_PROFISSIONAL";
-        return new CancelamentoResponse(coAgendado, status, "Agendamento cancelado com sucesso.");
+        CancelamentoResponse response = new CancelamentoResponse(coAgendado, status, "Agendamento cancelado com sucesso.");
+
+        log.info("FLOW_END service=AgendaService metodo=cancelar coAgendado={} status={}",
+                response.coAgendado(),
+                response.status());
+
+        return response;
     }
 
     private boolean isFimDeSemana(LocalDate data) {

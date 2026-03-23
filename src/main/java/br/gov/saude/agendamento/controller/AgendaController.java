@@ -9,6 +9,8 @@ import br.gov.saude.agendamento.dto.response.GradeResponse;
 import br.gov.saude.agendamento.service.AgendaService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.validation.annotation.Validated;
@@ -30,6 +32,8 @@ import java.util.List;
 @RequestMapping("/api/v1/agenda")
 public class AgendaController {
 
+    private static final Logger log = LoggerFactory.getLogger(AgendaController.class);
+
     private final AgendaService agendaService;
 
     public AgendaController(AgendaService agendaService) {
@@ -41,7 +45,17 @@ public class AgendaController {
             @PathVariable Long coLotacao,
             @RequestParam @NotNull @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate data
     ) {
-        return agendaService.obterGrade(coLotacao, data);
+        log.info("FLOW_START controller=AgendaController metodo=obterGrade coLotacao={} data={}", coLotacao, data);
+
+        GradeResponse response = agendaService.obterGrade(coLotacao, data);
+
+        log.info("FLOW_END controller=AgendaController metodo=obterGrade coLotacao={} data={} totalSlots={} slotsDisponiveis={}",
+                coLotacao,
+                data,
+                response.totalSlots(),
+                response.slotsDisponiveis());
+
+        return response;
     }
 
     @GetMapping("/{coLotacao}/agendamentos")
@@ -50,18 +64,52 @@ public class AgendaController {
             @RequestParam @NotNull @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate inicio,
             @RequestParam @NotNull @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fim
     ) {
-        return agendaService.listarAgendamentos(coLotacao, inicio, fim);
+        log.info("FLOW_START controller=AgendaController metodo=listarAgendamentos coLotacao={} inicio={} fim={}",
+                coLotacao,
+                inicio,
+                fim);
+
+        List<AgendamentoResponse> response = agendaService.listarAgendamentos(coLotacao, inicio, fim);
+
+        log.info("FLOW_END controller=AgendaController metodo=listarAgendamentos coLotacao={} totalRegistros={}",
+                coLotacao,
+                response.size());
+
+        return response;
     }
 
     @PostMapping("/agendar")
     @ResponseStatus(HttpStatus.CREATED)
     public AgendamentoCriadoResponse agendar(@Valid @RequestBody AgendarRequest request) {
-        return agendaService.agendar(request);
+        log.info("FLOW_START controller=AgendaController metodo=agendar coLotacao={} coProntuario={} data={} horaInicio={}",
+                request.coLotacao(),
+                request.coProntuario(),
+                request.data(),
+                request.horaInicio());
+
+        AgendamentoCriadoResponse response = agendaService.agendar(request);
+
+        log.info("FLOW_END controller=AgendaController metodo=agendar coAgendado={} uuidAgendamento={} status={}",
+                response.coAgendado(),
+                response.uuidAgendamento(),
+                response.status());
+
+        return response;
     }
 
     @PatchMapping("/{coAgendado}/cancelar")
     public CancelamentoResponse cancelar(@PathVariable Long coAgendado, @Valid @RequestBody CancelarRequest request) {
-        return agendaService.cancelar(coAgendado, request);
+        log.info("FLOW_START controller=AgendaController metodo=cancelar coAgendado={} motivoCancelamento={}",
+                coAgendado,
+                request.motivoCancelamento());
+
+        CancelamentoResponse response = agendaService.cancelar(coAgendado, request);
+
+        log.info("FLOW_END controller=AgendaController metodo=cancelar coAgendado={} status={}",
+                response.coAgendado(),
+                response.status());
+
+        return response;
     }
 }
 

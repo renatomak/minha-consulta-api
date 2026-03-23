@@ -27,6 +27,8 @@ public class ApiLoggingInterceptor implements HandlerInterceptor {
     public boolean preHandle(@NonNull HttpServletRequest request,
                              @NonNull HttpServletResponse response,
                              @NonNull Object handler) {
+        FlowLogContext.reset();
+
         String requestId = Optional.ofNullable(request.getHeader(REQUEST_ID_HEADER))
                 .filter(value -> !value.isBlank())
                 .orElse(UUID.randomUUID().toString());
@@ -63,15 +65,18 @@ public class ApiLoggingInterceptor implements HandlerInterceptor {
 
         String exceptionName = ex == null ? "-" : ex.getClass().getSimpleName();
 
-        log.info("HTTP_OUT requestId={} method={} path={} status={} durationMs={} handler={} exception={}",
+        log.info("HTTP_OUT requestId={} method={} path={} status={} durationMs={} handler={} exception={} sqlExecutada={} response={}",
                 requestId,
                 request.getMethod(),
                 request.getRequestURI(),
                 response.getStatus(),
                 durationMs,
                 resolveHandlerName(handler),
-                exceptionName);
+                exceptionName,
+                FlowLogContext.getSqlSummary(),
+                FlowLogContext.getResponseSummary());
 
+        FlowLogContext.clear();
         MDC.remove(REQUEST_ID_MDC_KEY);
     }
 

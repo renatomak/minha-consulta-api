@@ -11,7 +11,10 @@ public class HibernateLoggingConfig {
 
     @Bean
     public StatementInspector statementInspector() {
-        return new JpaSqlCaptureInspector();
+        return sql -> {
+            FlowLogContext.addSql(sql);
+            return sql;
+        };
     }
 
     @Bean

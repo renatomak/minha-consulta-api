@@ -3,9 +3,9 @@ server:
 
 spring:
   datasource:
-    url: ${DATABASE_URL:jdbc:postgresql://ep-red-moon-akd52v7p-pooler.c-3.us-west-2.aws.neon.tech/neondb?sslmode=require}
-    username: ${DATABASE_USERNAME:neondb_owner}
-    password: ${DATABASE_PASSWORD:npg_2sR7BqdkVbjp}
+    url: "${DATABASE_URL:jdbc:postgresql://10.52.31.101:5433/esus}"
+    username: "${DATABASE_USERNAME:postgres}"
+    password: "${DATABASE_PASSWORD:zTUBR1L~pV70*cH0aEC3l8b7YFKaq}"
     driver-class-name: org.postgresql.Driver
     hikari:
       maximum-pool-size: 10
@@ -18,6 +18,13 @@ spring:
       hibernate:
         default_schema: public
         dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+        use_sql_comments: true
+
+logging:
+  level:
+    org.hibernate.SQL: DEBUG
+    org.hibernate.orm.jdbc.bind: TRACE
 
 springdoc:
   api-docs:

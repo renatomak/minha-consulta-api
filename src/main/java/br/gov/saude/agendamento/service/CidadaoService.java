@@ -9,6 +9,8 @@ import br.gov.saude.agendamento.repository.CidadaoRepository;
 import br.gov.saude.agendamento.repository.CidadaoVinculacaoEquipeRepository;
 import br.gov.saude.agendamento.repository.projection.CidadaoCpfProjection;
 import br.gov.saude.agendamento.repository.projection.VinculoEquipeProjection;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
@@ -16,6 +18,8 @@ import java.time.Period;
 
 @Service
 public class CidadaoService {
+
+    private static final Logger log = LoggerFactory.getLogger(CidadaoService.class);
 
     private final CidadaoRepository cidadaoRepository;
     private final CidadaoVinculacaoEquipeRepository vinculacaoEquipeRepository;
@@ -27,11 +31,22 @@ public class CidadaoService {
     }
 
     public CidadaoDetalheResponse buscarPorCpf(String cpf) {
+        log.info("FLOW_START service=CidadaoService metodo=buscarPorCpf cpf={}", cpf);
+
         CidadaoCpfProjection cidadao = cidadaoRepository.buscarPorCpf(cpf)
                 .orElseThrow(() -> new CidadaoNaoEncontradoException("Nao foi encontrado cidadao ativo para o CPF informado."));
 
+        log.info("FLOW_CRITICAL service=CidadaoService metodo=buscarPorCpf etapa=cidadaoEncontrado coSeqCidadao={} coProntuario={}",
+                cidadao.getCoSeqCidadao(),
+                cidadao.getCoProntuario());
+
         VinculoEquipeProjection vinculo = vinculacaoEquipeRepository.buscarVinculoMaisRecente(cidadao.getCoSeqCidadao())
                 .orElseThrow(() -> new VinculoNaoEncontradoException("Cidadao encontrado, mas sem vinculacao com UBS/equipe."));
+
+        log.info("FLOW_CRITICAL service=CidadaoService metodo=buscarPorCpf etapa=vinculoEncontrado coSeqCidadao={} coSeqEquipe={} coSeqUnidadeSaude={}",
+                cidadao.getCoSeqCidadao(),
+                vinculo.getCoSeqEquipe(),
+                vinculo.getCoSeqUnidadeSaude());
 
         String endereco = "%s, %s - %s".formatted(
                 nullToBlank(vinculo.getDsLogradouro()),
@@ -39,7 +54,7 @@ public class CidadaoService {
                 nullToBlank(vinculo.getNoBairro())
         );
 
-        return new CidadaoDetalheResponse(
+        CidadaoDetalheResponse response = new CidadaoDetalheResponse(
                 cidadao.getCoSeqCidadao(),
                 cidadao.getNome(),
                 cidadao.getNuCpf(),
@@ -63,6 +78,13 @@ public class CidadaoService {
                         vinculo.getIneEquipe()
                 )
         );
+
+        log.info("FLOW_END service=CidadaoService metodo=buscarPorCpf cpf={} coSeqCidadao={} coSeqEquipe={}",
+                cpf,
+                response.coSeqCidadao(),
+                response.equipe() == null ? null : response.equipe().coSeq());
+
+        return response;
     }
 
     private Integer calcularIdade(LocalDate nascimento) {

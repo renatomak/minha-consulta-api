@@ -51,7 +51,7 @@ public class AgendadoRepositoryImpl implements AgendadoRepositoryCustom {
                     CAST(:data AS date),
                     CAST(:data || ' ' || :horaInicio AS timestamp),
                     :observacao,
-                    1,
+                    0,
                     :coLotacao,
                     :coMotivoReserva,
                     :coOrigem,

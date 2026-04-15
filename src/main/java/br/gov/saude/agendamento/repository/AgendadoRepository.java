@@ -58,6 +58,7 @@ public interface AgendadoRepository extends JpaRepository<Agendado, Long>, Agend
                 SELECT
                     TO_CHAR(ag.hr_inicial_agendado, 'HH24:MI') AS horario,
                     ag.co_seq_agendado,
+                    ag.co_prontuario AS prontuario,
                     sa.no_identificador AS status,
                     COALESCE(c.no_social, c.no_cidadao) AS paciente
                 FROM public.tb_agendado ag
@@ -67,7 +68,7 @@ public interface AgendadoRepository extends JpaRepository<Agendado, Long>, Agend
                 WHERE ag.co_lotacao_agendada = :coLotacao
                   AND ag.dt_agendado::date = CAST(:data AS date)
                   AND sa.no_identificador NOT IN (
-                      'CANCELADO_CIDADAO', 'CANCELADO_PROFISSIONAL'
+                      'CANCELADO_CIDADAO', 'CANCELADO_PROFISSIONAL', 'CANCELADO'
                   )
             ),
             bloqueado AS (
@@ -88,6 +89,7 @@ public interface AgendadoRepository extends JpaRepository<Agendado, Long>, Agend
                     ELSE                            'DISPONIVEL'
                 END                           AS situacao,
                 o.co_seq_agendado,
+                o.prontuario,
                 o.status                      AS status_agendamento,
                 o.paciente,
                 b.ds_motivo                   AS motivo_bloqueio
@@ -104,7 +106,7 @@ public interface AgendadoRepository extends JpaRepository<Agendado, Long>, Agend
             WHERE ag.co_lotacao_agendada = :coLotacao
               AND ag.co_prontuario = :coProntuario
               AND ag.dt_agendado::date = :data
-              AND ag.st_agendado = 1
+              AND ag.st_agendado IN (0, 1)
             """, nativeQuery = true)
     long contarAgendamentoAtivoMesmoDia(Long coLotacao, Long coProntuario, LocalDate data);
 }

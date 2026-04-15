@@ -6,6 +6,7 @@ public record SlotResponse(
         String periodo,
         String situacao,
         Long coAgendado,
+        Long prontuario,
         String statusAgendamento,
         String paciente
 ) {

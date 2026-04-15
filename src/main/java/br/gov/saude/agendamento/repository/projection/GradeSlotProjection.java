@@ -11,6 +11,8 @@ public interface GradeSlotProjection {
 
     Long getCoSeqAgendado();
 
+    Long getProntuario();
+
     String getStatusAgendamento();
 
     String getPaciente();

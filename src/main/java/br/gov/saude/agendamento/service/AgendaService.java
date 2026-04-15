@@ -37,7 +37,7 @@ import java.util.UUID;
 @Service
 public class AgendaService {
 
-    private static final long STATUS_AGENDADO = 1L;
+    private static final long STATUS_AGENDADO = 0L;
     private static final Logger log = LoggerFactory.getLogger(AgendaService.class);
 
     private final LotacaoRepository lotacaoRepository;
@@ -106,6 +106,7 @@ public class AgendaService {
                         slot.getPeriodo(),
                         slot.getSituacao(),
                         slot.getCoSeqAgendado(),
+                        slot.getProntuario(),
                         slot.getStatusAgendamento(),
                         slot.getPaciente()
                 ))
@@ -321,8 +322,7 @@ public class AgendaService {
         }
 
         Long novoStatus = switch (request.motivoCancelamento()) {
-            case "CIDADAO" -> 2L;
-            case "PROFISSIONAL" -> 3L;
+            case "CIDADAO", "PROFISSIONAL" -> 4L;
             default -> throw new IllegalArgumentException("Motivo de cancelamento invalido.");
         };
 
@@ -333,7 +333,7 @@ public class AgendaService {
                 coAgendado,
                 novoStatus);
 
-        String status = novoStatus == 2L ? "CANCELADO_CIDADAO" : "CANCELADO_PROFISSIONAL";
+        String status = "CANCELADO";
         CancelamentoResponse response = new CancelamentoResponse(coAgendado, status, "Agendamento cancelado com sucesso.");
 
         log.info("FLOW_END service=AgendaService metodo=cancelar coAgendado={} status={}",
